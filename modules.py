@@ -14,7 +14,7 @@ def positional_encoding(pos, d_model):
     pos_enc[:, 0::2] = np.sin(pos_enc[:, 0::2])
     pos_enc[:, 1::2] = np.cos(pos_enc[:, 1::2])
 
-    return(pos_enc)
+    return pos_enc[np.newaxis, :]
 
 
 # pos_encoding = positional_encoding(50, 512)
@@ -28,7 +28,7 @@ def scaled_dot_product_attention(q, k, v, mask=None):
     k_t = tf.transpose(k, [0, 2, 1])
 
     attn = tf.linalg.matmul(q, k_t)
-    scaled_attn = attn/math.sqrt(d_k)
+    scaled_attn = attn/np.sqrt(d_k)
 
     attn_weights = tf.nn.softmax(scaled_attn)
 
@@ -90,8 +90,8 @@ def EncoderLayer(x, d_model, d_ff, num_heads=8, rate=0.1, training=False, mask=N
     return output2
 
 
-sample_encoder_layer_output = EncoderLayer(
-    tf.random.uniform((64, 43, 512)), 512, 2048)
+# sample_encoder_layer_output = EncoderLayer(
+#     tf.random.uniform((64, 43, 512)), 512, 2048)
 
 # print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
 
@@ -115,8 +115,49 @@ def DecoderLayer(x, encoder_out, d_model, d_ff, num_heads=8, rate=0.1, training=
     return output3, scaled_attn_weights, scaled_attn_weights2
 
 
-sample_decoder_layer_output, _, _ = DecoderLayer(
-    tf.random.uniform((64, 50, 512)), sample_encoder_layer_output, 512, 2048)
+# sample_decoder_layer_output, _, _ = DecoderLayer(
+#     tf.random.uniform((64, 50, 512)), sample_encoder_layer_output, 512, 2048)
 
-print(sample_decoder_layer_output.shape)
+# print(sample_decoder_layer_output.shape)
 
+
+class Encoder(tf.keras.layers.Layer):
+    def __init__(self, num_layers, d_model, num_heads, d_ff, input_vocab_size,
+                 maximum_position_encoding, rate=0.1):
+        super(Encoder, self).__init__()
+
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.input_vocab_size = input_vocab_size
+        self.maximum_position_encoding = maximum_position_encoding
+        self.rate = rate
+
+    def call(self, x, training=False, mask=None):
+
+        pos_enc = positional_encoding(
+            self.maximum_position_encoding, self.d_model)
+
+        seq_len = tf.shape(x)[1]
+
+        x = tf.keras.layers.Embedding(self.input_vocab_size, self.d_model)(x)
+        x *= np.sqrt(self.d_model)
+        x += pos_enc[:, :seq_len, :]
+
+        x = tf.keras.layers.Dropout(self.rate)(x, training=training)
+
+        for i in range(self.num_layers):
+            x = EncoderLayer(x, self.d_model, self.d_ff, self.num_heads)
+
+        return x
+
+
+sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8,
+                         d_ff=2048, input_vocab_size=8500,
+                         maximum_position_encoding=10000)
+temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
+
+sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
+
+print(sample_encoder_output.shape)  # (batch_size, input_seq_len, d_model)
