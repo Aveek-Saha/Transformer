@@ -4,6 +4,21 @@ import math
 
 print(tf.__version__)
 
+def positional_encoding(pos, d_model):
+    pos_enc = np.array([
+        [p / np.power(10000, (i-(i % 2))/d_model)
+        for i in range(d_model)] 
+        for p in range(pos)])
+
+    pos_enc[:, 0::2] = np.sin(pos_enc[:, 0::2])
+    pos_enc[:, 1::2] = np.cos(pos_enc[:, 1::2])
+
+    return(pos_enc)
+
+
+# pos_encoding = positional_encoding(50, 512)
+# print(pos_encoding.shape)
+
 
 def scaled_dot_product_attention(q, k, v, mask = None):
     """Scaled dot product attention"""
@@ -55,8 +70,8 @@ def pointwise_feed_forward(inputs, dim):
     return output
 
 
-res = pointwise_feed_forward(tf.random.uniform((64, 50, 512)), (2048, 512))
-print(res.shape)
+# res = pointwise_feed_forward(tf.random.uniform((64, 50, 512)), (2048, 512))
+# print(res.shape)
 
 
 
