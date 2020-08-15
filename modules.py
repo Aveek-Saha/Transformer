@@ -42,12 +42,21 @@ def multi_head_attention(q, k, v, num_heads=8, mask=None):
     return output, scaled_attn_weights
 
 
-y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
-out, attn = multi_head_attention(y, y, y)
-print(out.shape, attn.shape)
+# y = tf.random.uniform((1, 60, 512))  # (batch_size, encoder_sequence, d_model)
+# out, attn = multi_head_attention(y, y, y)
+# print(out.shape, attn.shape)
 
 
+def pointwise_feed_forward(inputs, dim):
 
+    output = tf.keras.layers.Dense(dim[0], 'relu')(inputs)
+    output = tf.keras.layers.Dense(dim[1])(output)
+
+    return output
+
+
+res = pointwise_feed_forward(tf.random.uniform((64, 50, 512)), (2048, 512))
+print(res.shape)
 
 
 
