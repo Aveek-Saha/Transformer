@@ -74,4 +74,34 @@ def pointwise_feed_forward(inputs, dim):
 # print(res.shape)
 
 
+class EncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, num_heads, d_model, d_ff, rate=0.1):
+        super(EncoderLayer, self).__init__()
+        self.num_heads = num_heads
+        self.ff_dim = (d_ff, d_model)
 
+        self.ln1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ln2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+
+    def call(self, x, training=False, mask=None):
+
+        scaled_attn, scaled_attn_weights = multi_head_attention(x, x, x, self.num_heads)
+        scaled_attn = self.dropout1(scaled_attn, training=training)
+        output1 = self.ln1(x + scaled_attn)
+
+        ff_output = pointwise_feed_forward(output1, self.ff_dim)
+        ff_output = self.dropout1(ff_output, training=training)
+        output2 = self.ln2(output1 + ff_output)
+
+        return output2
+
+
+sample_encoder_layer = EncoderLayer(8, 512, 2048)
+
+sample_encoder_layer_output = sample_encoder_layer(
+    tf.random.uniform((64, 43, 512)), False, None)
+
+print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
