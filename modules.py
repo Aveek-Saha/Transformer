@@ -4,10 +4,11 @@ import math
 
 print(tf.__version__)
 
+
 def positional_encoding(pos, d_model):
     pos_enc = np.array([
         [p / np.power(10000, (i-(i % 2))/d_model)
-        for i in range(d_model)] 
+         for i in range(d_model)]
         for p in range(pos)])
 
     pos_enc[:, 0::2] = np.sin(pos_enc[:, 0::2])
@@ -20,12 +21,12 @@ def positional_encoding(pos, d_model):
 # print(pos_encoding.shape)
 
 
-def scaled_dot_product_attention(q, k, v, mask = None):
+def scaled_dot_product_attention(q, k, v, mask=None):
     """Scaled dot product attention"""
 
     d_k = tf.shape(k)[-1]
     k_t = tf.transpose(k, [0, 2, 1])
-    
+
     attn = tf.linalg.matmul(q, k_t)
     scaled_attn = attn/math.sqrt(d_k)
 
@@ -76,18 +77,46 @@ def pointwise_feed_forward(inputs, dim):
 
 def EncoderLayer(x, d_model, d_ff, num_heads=8, rate=0.1, training=False, mask=None):
 
-        scaled_attn, scaled_attn_weights = multi_head_attention(x, x, x, num_heads)
-        scaled_attn = tf.keras.layers.Dropout(rate)(scaled_attn, training=training)
-        output1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x + scaled_attn)
+    scaled_attn, scaled_attn_weights = multi_head_attention(
+        x, x, x, num_heads, mask)
+    scaled_attn = tf.keras.layers.Dropout(rate)(scaled_attn, training=training)
+    output1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x + scaled_attn)
 
-        ff_output = pointwise_feed_forward(output1, (d_ff, d_model))
-        ff_output = tf.keras.layers.Dropout(rate)(ff_output, training=training)
-        output2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(output1 + ff_output)
+    ff_output = pointwise_feed_forward(output1, (d_ff, d_model))
+    ff_output = tf.keras.layers.Dropout(rate)(ff_output, training=training)
+    output2 = tf.keras.layers.LayerNormalization(
+        epsilon=1e-6)(output1 + ff_output)
 
-        return output2
+    return output2
 
 
-# sample_encoder_layer_output = EncoderLayer(
-#     tf.random.uniform((64, 43, 512)), 512, 2048)
+sample_encoder_layer_output = EncoderLayer(
+    tf.random.uniform((64, 43, 512)), 512, 2048)
 
 # print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
+
+def DecoderLayer(x, encoder_out, d_model, d_ff, num_heads=8, rate=0.1, training=False, padding_mask=None, look_ahead_mask=None):
+    scaled_attn, scaled_attn_weights = multi_head_attention(x, x, x, num_heads)
+    scaled_attn = tf.keras.layers.Dropout(rate)(scaled_attn, training=training)
+    output1 = tf.keras.layers.LayerNormalization(
+        epsilon=1e-6)(x + scaled_attn)
+
+    scaled_attn2, scaled_attn_weights2 = multi_head_attention(
+        output1, encoder_out, encoder_out, num_heads)
+    scaled_attn2 = tf.keras.layers.Dropout(rate)(scaled_attn2, training=training)
+    output2 = tf.keras.layers.LayerNormalization(
+        epsilon=1e-6)(x + scaled_attn2)
+
+    ff_output = pointwise_feed_forward(output2, (d_ff, d_model))
+    ff_output = tf.keras.layers.Dropout(rate)(ff_output, training=training)
+    output3 = tf.keras.layers.LayerNormalization(
+        epsilon=1e-6)(output2 + ff_output)
+
+    return output3, scaled_attn_weights, scaled_attn_weights2
+
+
+sample_decoder_layer_output, _, _ = DecoderLayer(
+    tf.random.uniform((64, 50, 512)), sample_encoder_layer_output, 512, 2048)
+
+print(sample_decoder_layer_output.shape)
+
