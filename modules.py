@@ -67,30 +67,44 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 # print(out)
 
 
-def multi_head_attention(q, k, v, num_heads=8, mask=None):
+class MultiHeadAttention(tf.keras.layers.Layer):
+    def __init__(self, d_model, num_heads=8, mask=None):
+        super(MultiHeadAttention, self).__init__()
 
-    d_model = q.shape.as_list()[-1]
-    batch_size = tf.shape(q)[0]
-    seq_len_1 = tf.shape(q)[1]
-    seq_len_2 = tf.shape(k)[1]
+        self.dense_q = tf.keras.layers.Dense(d_model)
+        self.dense_k = tf.keras.layers.Dense(d_model)
+        self.dense_v = tf.keras.layers.Dense(d_model)
 
-    q = tf.keras.layers.Dense(d_model)(q)
-    k = tf.keras.layers.Dense(d_model)(k)
-    v = tf.keras.layers.Dense(d_model)(v)
+        self.dense_out = tf.keras.layers.Dense(d_model)
 
-    q = tf.concat(tf.split(q, num_heads, axis=2), axis=0)
-    k = tf.concat(tf.split(k, num_heads, axis=2), axis=0)
-    v = tf.concat(tf.split(v, num_heads, axis=2), axis=0)
+        self.num_heads = num_heads
 
-    scaled_attn, scaled_attn_weights = scaled_dot_product_attention(q, k, v)
-    scaled_attn_weights = tf.reshape(
-        scaled_attn_weights, (batch_size, num_heads, seq_len_1, seq_len_2))
+    
+    def call(q, k, v):
 
-    scaled_attn = tf.concat(tf.split(scaled_attn, num_heads, axis=0), axis=2)
+        d_model = q.shape.as_list()[-1]
+        batch_size = tf.shape(q)[0]
+        seq_len_1 = tf.shape(q)[1]
+        seq_len_2 = tf.shape(k)[1]
 
-    output = tf.keras.layers.Dense(d_model)(scaled_attn)
+        q = self.dense_q(q)
+        k = self.dense_k(k)
+        v = self.dense_v(v)
 
-    return output, scaled_attn_weights
+        q = tf.concat(tf.split(q, num_heads, axis=2), axis=0)
+        k = tf.concat(tf.split(k, num_heads, axis=2), axis=0)
+        v = tf.concat(tf.split(v, num_heads, axis=2), axis=0)
+
+        scaled_attn, scaled_attn_weights = scaled_dot_product_attention(q, k, v)
+        scaled_attn_weights = tf.reshape(
+            scaled_attn_weights, (batch_size, self.num_heads, seq_len_1, seq_len_2))
+
+        scaled_attn = tf.concat(
+            tf.split(scaled_attn, self.num_heads, axis=0), axis=2)
+
+        output = self.dense_out(scaled_attn)
+
+        return output, scaled_attn_weights
 
 
 # y = tf.random.uniform((2, 60, 512))  # (batch_size, encoder_sequence, d_model)
