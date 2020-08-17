@@ -112,10 +112,10 @@ def EncoderLayer(x, d_model, d_ff, num_heads=8, rate=0.1, training=False, mask=N
     return output2
 
 
-sample_encoder_layer_output = EncoderLayer(
-    tf.random.uniform((64, 43, 512)), 512, 2048)
+# sample_encoder_layer_output = EncoderLayer(
+#     tf.random.uniform((64, 43, 512)), 512, 2048)
 
-print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
+# print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
 
 def DecoderLayer(x, encoder_out, d_model, d_ff, num_heads=8, rate=0.1, training=False, padding_mask=None, look_ahead_mask=None):
     scaled_attn, scaled_attn_weights = multi_head_attention(x, x, x, num_heads)
@@ -177,12 +177,12 @@ class Encoder(tf.keras.layers.Layer):
         return x
 
 
-sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8,
-                         d_ff=2048, input_vocab_size=8500,
-                         maximum_position_encoding=10000)
-temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
+# sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8,
+#                          d_ff=2048, input_vocab_size=8500,
+#                          maximum_position_encoding=10000)
+# temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
 
-sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
+# sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
 
 # print(sample_encoder.trainable_variables)  # (batch_size, input_seq_len, d_model)
 
@@ -224,15 +224,60 @@ class Decoder(tf.keras.layers.Layer):
         return x, attn_weights
 
 
-sample_decoder = Decoder(num_layers=2, d_model=512, num_heads=8,
-                         d_ff=2048, target_vocab_size=8000,
-                         maximum_position_encoding=5000)
-temp_input = tf.random.uniform((64, 26), dtype=tf.int64, minval=0, maxval=200)
+# sample_decoder = Decoder(num_layers=2, d_model=512, num_heads=8,
+#                          d_ff=2048, target_vocab_size=8000,
+#                          maximum_position_encoding=5000)
+# temp_input = tf.random.uniform((64, 26), dtype=tf.int64, minval=0, maxval=200)
 
-output, attn = sample_decoder(temp_input,
-                              enc_output=sample_encoder_output,
-                              training=False,
-                              look_ahead_mask=None,
-                              padding_mask=None)
+# output, attn = sample_decoder(temp_input,
+#                               enc_output=sample_encoder_output,
+#                               training=False,
+#                               look_ahead_mask=None,
+#                               padding_mask=None)
 
-print(output.shape, attn[1]['block_2'].shape)
+# print(output.shape, attn[1]['block_2'].shape)
+
+
+class Transformer(tf.keras.Model):
+    def __init__(self, num_layers, d_model, num_heads, d_ff, input_vocab_size, 
+    target_vocab_size, pos_enc_input, pos_enc_target, rate=0.1):
+
+        super(Transformer, self).__init__()
+
+        self.num_layers = num_layers
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.input_vocab_size = input_vocab_size
+        self.target_vocab_size = target_vocab_size
+        self.pos_enc_input = pos_enc_input
+        self.pos_enc_target = pos_enc_target
+        self.rate = rate
+
+    def call(self, inputs, targets, training, enc_padding_mask, look_ahead_mask, dec_padding_mask):
+
+        encoder_out = Encoder(self.num_layers, self.d_model, self.num_heads, self.d_ff,
+                              self.input_vocab_size, self. pos_enc_input, self.rate)(inputs, training, enc_padding_mask)
+
+        decoder_out, attn_weights = Decoder(self.num_layers, self.d_model, self.num_heads, self.d_ff, self.target_vocab_size,
+                                            self.pos_enc_target, self.rate)(targets, encoder_out, training, look_ahead_mask, dec_padding_mask)
+
+        output = tf.keras.layers.Dense(self.target_vocab_size)(decoder_out)
+
+        return output, attn_weights
+
+
+sample_transformer = Transformer(
+    num_layers=2, d_model=512, num_heads=8, d_ff=2048,
+    input_vocab_size=8500, target_vocab_size=8000,
+    pos_enc_input=10000, pos_enc_target=6000)
+
+temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
+temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
+
+fn_out, _ = sample_transformer(temp_input, temp_target, training=False,
+                               enc_padding_mask=None,
+                               look_ahead_mask=None,
+                               dec_padding_mask=None)
+
+print(fn_out.shape)
