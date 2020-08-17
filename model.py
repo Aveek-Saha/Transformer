@@ -128,17 +128,17 @@ class Transformer(tf.keras.Model):
         return output, attn_weights
 
 
-sample_transformer = Transformer(
-    num_layers=2, d_model=512, num_heads=8, d_ff=2048,
-    input_vocab_size=8500, target_vocab_size=8000,
-    pos_enc_input=10000, pos_enc_target=6000)
+# sample_transformer = Transformer(
+#     num_layers=2, d_model=512, num_heads=8, d_ff=2048,
+#     input_vocab_size=8500, target_vocab_size=8000,
+#     pos_enc_input=10000, pos_enc_target=6000)
 
-temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
-temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
+# temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
+# temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
 
-fn_out, _ = sample_transformer(temp_input, temp_target, training=False,
-                               enc_padding_mask=None,
-                               look_ahead_mask=None,
-                               dec_padding_mask=None)
+# fn_out, _ = sample_transformer(temp_input, temp_target, training=False,
+#                                enc_padding_mask=None,
+#                                look_ahead_mask=None,
+#                                dec_padding_mask=None)
 
-print(fn_out.shape)
+# print(fn_out.shape)
