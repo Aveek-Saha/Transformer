@@ -14,21 +14,34 @@ def positional_encoding(pos, d_model):
     pos_enc[:, 0::2] = np.sin(pos_enc[:, 0::2])
     pos_enc[:, 1::2] = np.cos(pos_enc[:, 1::2])
 
-    return pos_enc[np.newaxis, :]
+    return tf.cast(pos_enc[np.newaxis, :], tf.float32)
 
 
 # pos_encoding = positional_encoding(50, 512)
 # print(pos_encoding.shape)
 
+def create_padding_mask(seq):
+  mask = tf.cast(tf.math.equal(seq, 0), tf.float32)
+
+  return mask[:, tf.newaxis, tf.newaxis, :]
+
+
+def create_look_ahead_mask(size):
+  mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
+  return mask
+
 
 def scaled_dot_product_attention(q, k, v, mask=None):
     """Scaled dot product attention"""
 
-    d_k = tf.shape(k)[-1]
+    d_k = tf.cast(tf.shape(k)[-1], tf.float32)
     # k_t = tf.transpose(k)
 
     attn = tf.linalg.matmul(q, k, transpose_b=True)
-    scaled_attn = attn/np.sqrt(d_k)
+    scaled_attn = attn/tf.math.sqrt(d_k)
+
+    if mask is not None:
+        scaled_attn += (mask * -1e9)
 
     attn_weights = tf.nn.softmax(scaled_attn, axis=-1)
 
@@ -56,7 +69,7 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 
 def multi_head_attention(q, k, v, num_heads=8, mask=None):
 
-    d_model = tf.shape(q)[-1]
+    d_model = q.shape.as_list()[-1]
     batch_size = tf.shape(q)[0]
     seq_len_1 = tf.shape(q)[1]
     seq_len_2 = tf.shape(k)[1]

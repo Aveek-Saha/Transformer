@@ -5,6 +5,9 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
+from model import Transformer
+from modules import create_look_ahead_mask, create_padding_mask
+
 
 examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en', with_info=True,
                                as_supervised=True)
@@ -66,16 +69,18 @@ train_dataset = train_examples.map(tf_encode)
 train_dataset = train_dataset.filter(filter_max_length)
 # cache the dataset to memory to get a speedup while reading from it.
 train_dataset = train_dataset.cache()
-train_dataset = train_dataset.shuffle(BUFFER_SIZE).padded_batch(BATCH_SIZE)
+train_dataset = train_dataset.shuffle(BUFFER_SIZE).padded_batch(
+    BATCH_SIZE, padded_shapes=([None], [None]))
 train_dataset = train_dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
 
 val_dataset = val_examples.map(tf_encode)
-val_dataset = val_dataset.filter(filter_max_length).padded_batch(BATCH_SIZE)
+val_dataset = val_dataset.filter(filter_max_length).padded_batch(
+    BATCH_SIZE, padded_shapes=([None], [None]))
 
 num_layers = 4
 d_model = 128
-dff = 512
+d_ff = 512
 num_heads = 8
 
 input_vocab_size = tokenizer_pt.vocab_size + 2
@@ -116,6 +121,17 @@ def loss_function(real, pred):
 
   return tf.reduce_sum(loss_)/tf.reduce_sum(mask)
 
+
+def create_masks(inp, tar):
+  # Encoder padding mask
+  enc_padding_mask = create_padding_mask(inp)
+  dec_padding_mask = create_padding_mask(inp)
+
+  look_ahead_mask = create_look_ahead_mask(tf.shape(tar)[1])
+  dec_target_padding_mask = create_padding_mask(tar)
+  combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
+
+  return enc_padding_mask, combined_mask, dec_padding_mask
 
 train_loss = tf.keras.metrics.Mean(name='train_loss')
 train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
