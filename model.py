@@ -12,31 +12,27 @@ class Encoder(tf.keras.layers.Layer):
 
         self.num_layers = num_layers
         self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_ff = d_ff
-        self.input_vocab_size = input_vocab_size
-        self.maximum_position_encoding = maximum_position_encoding
-        self.rate = rate
+
+        self.pos_enc = positional_encoding(maximum_position_encoding, d_model)
 
         self.embedding = tf.keras.layers.Embedding(input_vocab_size, d_model)
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, training=False, mask=None):
+        self.encoder_layers = [EncoderLayer(
+            d_model, d_ff, num_heads, rate) for x in range(num_layers)]
 
-        pos_enc = positional_encoding(
-            self.maximum_position_encoding, self.d_model)
+    def call(self, x, training=False, mask=None):
 
         seq_len = tf.shape(x)[1]
 
         x = self.embedding(x)
         x *= np.sqrt(self.d_model)
-        x += pos_enc[:, :seq_len, :]
+        x += self.pos_enc[:, :seq_len, :]
 
         x = self.dropout(x, training=training)
 
         for i in range(self.num_layers):
-            x = EncoderLayer(x, self.d_model, self.d_ff,
-                             self.num_heads, self.rate, training, mask)
+            x = self.encoder_layers[i](x, training, mask)
 
         return x
 
@@ -125,10 +121,8 @@ class Transformer(tf.keras.Model):
                                input_vocab_size,  pos_enc_input, rate)
         self.decoder = Decoder(num_layers, d_model, num_heads, d_ff, target_vocab_size,
                                pos_enc_target, rate)
-        
-        self.dense = tf.keras.layers.Dense(target_vocab_size)
 
-        
+        self.dense = tf.keras.layers.Dense(target_vocab_size)
 
     def call(self, inputs, targets, training, enc_padding_mask, look_ahead_mask, dec_padding_mask):
 
