@@ -68,7 +68,7 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads=8, mask=None):
+    def __init__(self, d_model, num_heads=8):
         super(MultiHeadAttention, self).__init__()
 
         self.dense_q = tf.keras.layers.Dense(d_model)
@@ -79,8 +79,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         self.num_heads = num_heads
 
-    
-    def call(q, k, v):
+    def call(self, q, k, v, mask=None):
 
         d_model = q.shape.as_list()[-1]
         batch_size = tf.shape(q)[0]
@@ -95,7 +94,8 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         k = tf.concat(tf.split(k, num_heads, axis=2), axis=0)
         v = tf.concat(tf.split(v, num_heads, axis=2), axis=0)
 
-        scaled_attn, scaled_attn_weights = scaled_dot_product_attention(q, k, v)
+        scaled_attn, scaled_attn_weights = scaled_dot_product_attention(
+            q, k, v, mask)
         scaled_attn_weights = tf.reshape(
             scaled_attn_weights, (batch_size, self.num_heads, seq_len_1, seq_len_2))
 
@@ -112,10 +112,12 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 # print(out.shape, attn.shape)
 
 
-def pointwise_feed_forward(inputs, dim):
+def pointwise_feed_forward(d_ff, d_model):
 
-    output = tf.keras.layers.Dense(dim[0], 'relu')(inputs)
-    output = tf.keras.layers.Dense(dim[1])(output)
+    output = tf.keras.Sequential([
+        tf.keras.layers.Dense(d_ff, 'relu'),
+        tf.keras.layers.Dense(d_model)
+    ])
 
     return output
 
@@ -124,17 +126,28 @@ def pointwise_feed_forward(inputs, dim):
 # print(res.shape)
 
 
-def EncoderLayer(x, d_model, d_ff, num_heads=8, rate=0.1, training=False, mask=None):
+class EncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, d_model, d_ff, num_heads=8, rate=0.1):
+        super(EncoderLayer, self).__init__()
 
-    scaled_attn, scaled_attn_weights = multi_head_attention(
-        x, x, x, num_heads, mask)
-    scaled_attn = tf.keras.layers.Dropout(rate)(scaled_attn, training=training)
-    output1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x + scaled_attn)
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
 
-    ff_output = pointwise_feed_forward(output1, (d_ff, d_model))
-    ff_output = tf.keras.layers.Dropout(rate)(ff_output, training=training)
-    output2 = tf.keras.layers.LayerNormalization(
-        epsilon=1e-6)(output1 + ff_output)
+        self.ln1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ln2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+        self.ff = pointwise_feed_forward(d_ff, d_model)
+        self.multi_head_attention = MultiHeadAttention(d_model, num_heads)
+
+    def call(self, x, training=False, mask=None):
+
+    scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
+    scaled_attn = self.dropout1(scaled_attn, training=training)
+    output1 = self.ln1(x + scaled_attn)
+
+    ff_output = self.ff(output1)
+    ff_output = self.dropout2(ff_output, training=training)
+    output2 = self.ln2(output1 + ff_output)
 
     return output2
 
@@ -144,25 +157,37 @@ def EncoderLayer(x, d_model, d_ff, num_heads=8, rate=0.1, training=False, mask=N
 
 # print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
 
-def DecoderLayer(x, encoder_out, d_model, d_ff, num_heads=8, rate=0.1, training=False, padding_mask=None, look_ahead_mask=None):
-    scaled_attn, scaled_attn_weights = multi_head_attention(x, x, x, num_heads)
-    scaled_attn = tf.keras.layers.Dropout(rate)(scaled_attn, training=training)
-    output1 = tf.keras.layers.LayerNormalization(
-        epsilon=1e-6)(x + scaled_attn)
+class DecoderLayer(tf.keras.layers.Layer):
+    def __init__(self, d_model, d_ff, num_heads=8, rate=0.1):
+        super(DecoderLayer, self).__init__()
 
-    scaled_attn2, scaled_attn_weights2 = multi_head_attention(
-        output1, encoder_out, encoder_out, num_heads)
-    scaled_attn2 = tf.keras.layers.Dropout(
-        rate)(scaled_attn2, training=training)
-    output2 = tf.keras.layers.LayerNormalization(
-        epsilon=1e-6)(x + scaled_attn2)
+        self.dropout1 = tf.keras.layers.Dropout(rate)
+        self.dropout2 = tf.keras.layers.Dropout(rate)
+        self.dropout3 = tf.keras.layers.Dropout(rate)
 
-    ff_output = pointwise_feed_forward(output2, (d_ff, d_model))
-    ff_output = tf.keras.layers.Dropout(rate)(ff_output, training=training)
-    output3 = tf.keras.layers.LayerNormalization(
-        epsilon=1e-6)(output2 + ff_output)
+        self.ln1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ln2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+        self.ln3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-    return output3, scaled_attn_weights, scaled_attn_weights2
+        self.ff = pointwise_feed_forward(d_ff, d_model)
+        self.multi_head_attention = MultiHeadAttention(d_model, num_heads)
+        
+    def call(self, x, encoder_out, training=False, padding_mask=None, look_ahead_mask=None):
+
+        scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
+        scaled_attn = self.dropout1(scaled_attn, training=training)
+        output1 = self.ln1(x + scaled_attn)
+
+        scaled_attn2, scaled_attn_weights2 = self.multi_head_attention(
+            output1, encoder_out, encoder_out)
+        scaled_attn2 = self.dropout2(scaled_attn2, training=training)
+        output2 = self.ln2(x + scaled_attn2)
+
+        ff_output = self.ff(output2)
+        ff_output = self.dropout3(ff_output, training=training)
+        output3 = self.ln3(output2 + ff_output)
+
+        return output3, scaled_attn_weights, scaled_attn_weights2
 
 
 # sample_decoder_layer_output, _, _ = DecoderLayer(
