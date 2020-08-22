@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from modules import positional_encoding, scaled_dot_product_attention, MultiHeadAttention, pointwise_feed_forward
-from modules import EncoderLayer, DecoderLayer, create_look_ahead_mask, create_padding_mask
+from modules import EncoderLayer, DecoderLayer
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -35,16 +35,6 @@ class Encoder(tf.keras.layers.Layer):
             x = self.encoder_layers[i](x, training, mask)
 
         return x
-
-
-# sample_encoder = Encoder(num_layers=2, d_model=512, num_heads=8,
-#                          d_ff=2048, input_vocab_size=8500,
-#                          maximum_position_encoding=10000)
-# temp_input = tf.random.uniform((64, 62), dtype=tf.int64, minval=0, maxval=200)
-
-# sample_encoder_output = sample_encoder(temp_input, training=False, mask=None)
-
-# print(sample_encoder.trainable_variables)  # (batch_size, input_seq_len, d_model)
 
 
 class Decoder(tf.keras.layers.Layer):
@@ -85,20 +75,6 @@ class Decoder(tf.keras.layers.Layer):
         return x, attn_weights
 
 
-# sample_decoder = Decoder(num_layers=2, d_model=512, num_heads=8,
-#                          d_ff=2048, target_vocab_size=8000,
-#                          maximum_position_encoding=5000)
-# temp_input = tf.random.uniform((64, 26), dtype=tf.int64, minval=0, maxval=200)
-
-# output, attn = sample_decoder(temp_input,
-#                               enc_output=sample_encoder_output,
-#                               training=False,
-#                               look_ahead_mask=None,
-#                               padding_mask=None)
-
-# print(output.shape, attn[1]['block_2'].shape)
-
-
 class Transformer(tf.keras.Model):
     def __init__(self, num_layers, d_model, num_heads, d_ff, input_vocab_size,
                  target_vocab_size, pos_enc_input, pos_enc_target, rate=0.1):
@@ -122,21 +98,3 @@ class Transformer(tf.keras.Model):
         output = self.dense(decoder_out)
 
         return output, attn_weights
-
-
-# sample_transformer = Transformer(
-#     num_layers=2, d_model=512, num_heads=8, d_ff=2048,
-#     input_vocab_size=8500, target_vocab_size=8000,
-#     pos_enc_input=10000, pos_enc_target=6000)
-
-# temp_input = tf.random.uniform((64, 38), dtype=tf.int64, minval=0, maxval=200)
-# temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
-
-# fn_out, _ = sample_transformer(temp_input, temp_target, training=False,
-#                                enc_padding_mask=create_padding_mask(
-#                                    temp_input),
-#                                look_ahead_mask=create_look_ahead_mask(
-#                                    tf.shape(temp_target)[1]),
-#                                dec_padding_mask=create_padding_mask(temp_input))
-
-# print(fn_out.shape)
