@@ -3,7 +3,6 @@ import tensorflow as tf
 
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 
 from model import Transformer
 from modules import create_look_ahead_mask, create_padding_mask
