@@ -26,6 +26,9 @@ def create_padding_mask(seq):
   return mask[:, tf.newaxis, tf.newaxis, :]
 
 
+# x = tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]])
+# print(create_padding_mask(tf.random.uniform((2, 60, 512))))
+
 def create_look_ahead_mask(size):
   mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
   return mask
@@ -62,7 +65,9 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 #                  [0, 10, 0],
 #                  [10, 10, 0]], dtype=tf.float32)
 
-# out, attn = scaled_dot_product_attention(q, k, v, None)
+# x = tf.random.uniform((2, 60, 512))
+# out, attn = scaled_dot_product_attention(
+#     x, x, x, create_padding_mask(x))
 # print(attn)
 # print(out)
 
@@ -78,36 +83,44 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.dense_out = tf.keras.layers.Dense(d_model)
 
         self.num_heads = num_heads
+        self.d_model = d_model
+
+        assert d_model % self.num_heads == 0
+
+        self.depth = d_model // self.num_heads
 
     def call(self, q, k, v, mask=None):
 
         batch_size = tf.shape(q)[0]
-        seq_len_1 = tf.shape(q)[1]
-        seq_len_2 = tf.shape(k)[1]
+        seq_len_q = tf.shape(q)[1]
+        seq_len_k = tf.shape(k)[1]
+        seq_len_v = tf.shape(v)[1]
 
         q = self.dense_q(q)
         k = self.dense_k(k)
         v = self.dense_v(v)
 
-        q = tf.concat(tf.split(q, self.num_heads, axis=2), axis=0)
-        k = tf.concat(tf.split(k, self.num_heads, axis=2), axis=0)
-        v = tf.concat(tf.split(v, self.num_heads, axis=2), axis=0)
+        q = tf.reshape(tf.concat(tf.split(q, self.num_heads, axis=2),
+                                 axis=0), (batch_size, -1, seq_len_q, self.depth))
+        k = tf.reshape(tf.concat(tf.split(k, self.num_heads, axis=2),
+                                 axis=0), (batch_size, -1, seq_len_k, self.depth))
+        v = tf.reshape(tf.concat(tf.split(v, self.num_heads, axis=2),
+                                 axis=0), (batch_size, -1, seq_len_v, self.depth))
 
         scaled_attn, scaled_attn_weights = scaled_dot_product_attention(
             q, k, v, mask)
-        scaled_attn_weights = tf.reshape(
-            scaled_attn_weights, (batch_size, self.num_heads, seq_len_1, seq_len_2))
 
-        scaled_attn = tf.concat(
-            tf.split(scaled_attn, self.num_heads, axis=0), axis=2)
+        scaled_attn = tf.reshape(
+            scaled_attn, (batch_size, -1, self.d_model))
 
         output = self.dense_out(scaled_attn)
 
         return output, scaled_attn_weights
 
 
+# temp_mha = MultiHeadAttention(d_model=512, num_heads=8)
 # y = tf.random.uniform((2, 60, 512))  # (batch_size, encoder_sequence, d_model)
-# out, attn = multi_head_attention(y, y, y)
+# out, attn = temp_mha(y, y, y)
 # print(out.shape, attn.shape)
 
 

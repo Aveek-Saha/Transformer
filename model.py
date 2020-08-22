@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from modules import positional_encoding, scaled_dot_product_attention, MultiHeadAttention, pointwise_feed_forward
-from modules import EncoderLayer, DecoderLayer
+from modules import EncoderLayer, DecoderLayer, create_look_ahead_mask, create_padding_mask
 
 
 class Encoder(tf.keras.layers.Layer):
@@ -133,8 +133,10 @@ class Transformer(tf.keras.Model):
 # temp_target = tf.random.uniform((64, 36), dtype=tf.int64, minval=0, maxval=200)
 
 # fn_out, _ = sample_transformer(temp_input, temp_target, training=False,
-#                                enc_padding_mask=None,
-#                                look_ahead_mask=None,
-#                                dec_padding_mask=None)
+#                                enc_padding_mask=create_padding_mask(
+#                                    temp_input),
+#                                look_ahead_mask=create_look_ahead_mask(
+#                                    tf.shape(temp_target)[1]),
+#                                dec_padding_mask=create_padding_mask(temp_input))
 
 # print(fn_out.shape)

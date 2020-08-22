@@ -35,7 +35,7 @@ tokenizer_pt = tfds.features.text.SubwordTextEncoder.build_from_corpus(
 #   print('{} ----> {}'.format(ts, tokenizer_en.decode([ts])))
 
 
-BUFFER_SIZE = 20000
+BUFFER_SIZE = 1000
 BATCH_SIZE = 64
 
 
