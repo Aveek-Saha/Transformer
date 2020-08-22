@@ -81,7 +81,6 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
     def call(self, q, k, v, mask=None):
 
-        d_model = q.shape.as_list()[-1]
         batch_size = tf.shape(q)[0]
         seq_len_1 = tf.shape(q)[1]
         seq_len_2 = tf.shape(k)[1]
@@ -90,9 +89,9 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         k = self.dense_k(k)
         v = self.dense_v(v)
 
-        q = tf.concat(tf.split(q, num_heads, axis=2), axis=0)
-        k = tf.concat(tf.split(k, num_heads, axis=2), axis=0)
-        v = tf.concat(tf.split(v, num_heads, axis=2), axis=0)
+        q = tf.concat(tf.split(q, self.num_heads, axis=2), axis=0)
+        k = tf.concat(tf.split(k, self.num_heads, axis=2), axis=0)
+        v = tf.concat(tf.split(v, self.num_heads, axis=2), axis=0)
 
         scaled_attn, scaled_attn_weights = scaled_dot_product_attention(
             q, k, v, mask)
@@ -141,15 +140,15 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     def call(self, x, training=False, mask=None):
 
-    scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
-    scaled_attn = self.dropout1(scaled_attn, training=training)
-    output1 = self.ln1(x + scaled_attn)
+        scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
+        scaled_attn = self.dropout1(scaled_attn, training=training)
+        output1 = self.ln1(x + scaled_attn)
 
-    ff_output = self.ff(output1)
-    ff_output = self.dropout2(ff_output, training=training)
-    output2 = self.ln2(output1 + ff_output)
+        ff_output = self.ff(output1)
+        ff_output = self.dropout2(ff_output, training=training)
+        output2 = self.ln2(output1 + ff_output)
 
-    return output2
+        return output2
 
 
 # sample_encoder_layer_output = EncoderLayer(
@@ -170,16 +169,19 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.ln3 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
         self.ff = pointwise_feed_forward(d_ff, d_model)
-        self.multi_head_attention = MultiHeadAttention(d_model, num_heads)
+
+        self.multi_head_attention1 = MultiHeadAttention(d_model, num_heads)
+        self.multi_head_attention2 = MultiHeadAttention(d_model, num_heads)
         
     def call(self, x, encoder_out, training=False, padding_mask=None, look_ahead_mask=None):
 
-        scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
+        scaled_attn, scaled_attn_weights = self.multi_head_attention1(
+            x, x, x, look_ahead_mask)
         scaled_attn = self.dropout1(scaled_attn, training=training)
         output1 = self.ln1(x + scaled_attn)
 
-        scaled_attn2, scaled_attn_weights2 = self.multi_head_attention(
-            output1, encoder_out, encoder_out)
+        scaled_attn2, scaled_attn_weights2 = self.multi_head_attention2(
+            output1, encoder_out, encoder_out, padding_mask)
         scaled_attn2 = self.dropout2(scaled_attn2, training=training)
         output2 = self.ln2(x + scaled_attn2)
 

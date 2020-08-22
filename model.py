@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from modules import positional_encoding, scaled_dot_product_attention, multi_head_attention, pointwise_feed_forward
+from modules import positional_encoding, scaled_dot_product_attention, MultiHeadAttention, pointwise_feed_forward
 from modules import EncoderLayer, DecoderLayer
 
 
@@ -54,31 +54,29 @@ class Decoder(tf.keras.layers.Layer):
 
         self.num_layers = num_layers
         self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_ff = d_ff
-        self.target_vocab_size = target_vocab_size
-        self.maximum_position_encoding = maximum_position_encoding
-        self.rate = rate
+
+        self.pos_enc = positional_encoding(maximum_position_encoding, d_model)
 
         self.embedding = tf.keras.layers.Embedding(target_vocab_size, d_model)
         self.dropout = tf.keras.layers.Dropout(rate)
 
+        self.decoder_layers = [DecoderLayer(
+            d_model, d_ff, num_heads, rate) for x in range(num_layers)]
+
     def call(self, x, enc_output, training=None, look_ahead_mask=None, padding_mask=None):
-        pos_enc = positional_encoding(
-            self.maximum_position_encoding, self.d_model)
 
         seq_len = tf.shape(x)[1]
         attn_weights = []
 
         x = self.embedding(x)
         x *= np.sqrt(self.d_model)
-        x += pos_enc[:, :seq_len, :]
+        x += self.pos_enc[:, :seq_len, :]
 
         x = self.dropout(x, training=training)
 
         for i in range(self.num_layers):
-            x, weight_block_1, weight_block_2 = DecoderLayer(x, enc_output, self.d_model, self.d_ff, self.num_heads,
-                                                             self.rate, training, look_ahead_mask, padding_mask)
+            x, weight_block_1, weight_block_2 = self.decoder_layers[i](
+                x, enc_output, training, padding_mask, look_ahead_mask)
             attn_weights.append({
                 "block_1": weight_block_1,
                 "block_2": weight_block_2
@@ -106,16 +104,6 @@ class Transformer(tf.keras.Model):
                  target_vocab_size, pos_enc_input, pos_enc_target, rate=0.1):
 
         super(Transformer, self).__init__()
-
-        self.num_layers = num_layers
-        self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_ff = d_ff
-        self.input_vocab_size = input_vocab_size
-        self.target_vocab_size = target_vocab_size
-        self.pos_enc_input = pos_enc_input
-        self.pos_enc_target = pos_enc_target
-        self.rate = rate
 
         self.encoder = Encoder(num_layers, d_model, num_heads, d_ff,
                                input_vocab_size,  pos_enc_input, rate)

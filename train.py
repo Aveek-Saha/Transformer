@@ -21,18 +21,18 @@ tokenizer_pt = tfds.features.text.SubwordTextEncoder.build_from_corpus(
     (pt.numpy() for pt, en in train_examples), target_vocab_size=2**13)
 
 
-sample_string = 'Transformer is awesome.'
+# sample_string = 'Transformer is awesome.'
 
-tokenized_string = tokenizer_en.encode(sample_string)
-print('Tokenized string is {}'.format(tokenized_string))
+# tokenized_string = tokenizer_en.encode(sample_string)
+# print('Tokenized string is {}'.format(tokenized_string))
 
-original_string = tokenizer_en.decode(tokenized_string)
-print('The original string: {}'.format(original_string))
+# original_string = tokenizer_en.decode(tokenized_string)
+# print('The original string: {}'.format(original_string))
 
-assert original_string == sample_string
+# assert original_string == sample_string
 
-for ts in tokenized_string:
-  print('{} ----> {}'.format(ts, tokenizer_en.decode([ts])))
+# for ts in tokenized_string:
+#   print('{} ----> {}'.format(ts, tokenizer_en.decode([ts])))
 
 
 BUFFER_SIZE = 20000
