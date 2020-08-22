@@ -17,17 +17,11 @@ def positional_encoding(pos, d_model):
     return tf.cast(pos_enc[np.newaxis, :], tf.float32)
 
 
-# pos_encoding = positional_encoding(50, 512)
-# print(pos_encoding.shape)
-
 def create_padding_mask(seq):
   mask = tf.cast(tf.math.equal(seq, 0), tf.float32)
 
   return mask[:, tf.newaxis, tf.newaxis, :]
 
-
-# x = tf.constant([[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]])
-# print(create_padding_mask(tf.random.uniform((2, 60, 512))))
 
 def create_look_ahead_mask(size):
   mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
@@ -35,10 +29,8 @@ def create_look_ahead_mask(size):
 
 
 def scaled_dot_product_attention(q, k, v, mask=None):
-    """Scaled dot product attention"""
 
     d_k = tf.cast(tf.shape(k)[-1], tf.float32)
-    # k_t = tf.transpose(k)
 
     attn = tf.linalg.matmul(q, k, transpose_b=True)
     scaled_attn = attn/tf.math.sqrt(d_k)
@@ -51,25 +43,6 @@ def scaled_dot_product_attention(q, k, v, mask=None):
     output = tf.linalg.matmul(attn_weights, v)
 
     return output, attn_weights
-
-
-# k = tf.constant([[10, 0, 0],
-#                  [0, 10, 0],
-#                  [0, 0, 10],
-#                  [0, 0, 10]], dtype=tf.float32)
-# v = tf.constant([[1, 0],
-#                  [10, 0],
-#                  [100, 5],
-#                  [1000, 6]], dtype=tf.float32)
-# q = tf.constant([[0, 0, 10],
-#                  [0, 10, 0],
-#                  [10, 10, 0]], dtype=tf.float32)
-
-# x = tf.random.uniform((2, 60, 512))
-# out, attn = scaled_dot_product_attention(
-#     x, x, x, create_padding_mask(x))
-# print(attn)
-# print(out)
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
@@ -118,12 +91,6 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         return output, scaled_attn_weights
 
 
-# temp_mha = MultiHeadAttention(d_model=512, num_heads=8)
-# y = tf.random.uniform((2, 60, 512))  # (batch_size, encoder_sequence, d_model)
-# out, attn = temp_mha(y, y, y)
-# print(out.shape, attn.shape)
-
-
 def pointwise_feed_forward(d_ff, d_model):
 
     output = tf.keras.Sequential([
@@ -132,10 +99,6 @@ def pointwise_feed_forward(d_ff, d_model):
     ])
 
     return output
-
-
-# res = pointwise_feed_forward(tf.random.uniform((64, 50, 512)), (2048, 512))
-# print(res.shape)
 
 
 class EncoderLayer(tf.keras.layers.Layer):
@@ -153,7 +116,8 @@ class EncoderLayer(tf.keras.layers.Layer):
 
     def call(self, x, training=False, mask=None):
 
-        scaled_attn, scaled_attn_weights = self.multi_head_attention(x, x, x, mask)
+        scaled_attn, scaled_attn_weights = self.multi_head_attention(
+            x, x, x, mask)
         scaled_attn = self.dropout1(scaled_attn, training=training)
         output1 = self.ln1(x + scaled_attn)
 
@@ -163,11 +127,6 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         return output2
 
-
-# sample_encoder_layer_output = EncoderLayer(
-#     tf.random.uniform((64, 43, 512)), 512, 2048)
-
-# print(sample_encoder_layer_output.shape)  # (batch_size, input_seq_len, d_model)
 
 class DecoderLayer(tf.keras.layers.Layer):
     def __init__(self, d_model, d_ff, num_heads=8, rate=0.1):
@@ -185,7 +144,7 @@ class DecoderLayer(tf.keras.layers.Layer):
 
         self.multi_head_attention1 = MultiHeadAttention(d_model, num_heads)
         self.multi_head_attention2 = MultiHeadAttention(d_model, num_heads)
-        
+
     def call(self, x, encoder_out, training=False, padding_mask=None, look_ahead_mask=None):
 
         scaled_attn, scaled_attn_weights = self.multi_head_attention1(
@@ -203,9 +162,3 @@ class DecoderLayer(tf.keras.layers.Layer):
         output3 = self.ln3(output2 + ff_output)
 
         return output3, scaled_attn_weights, scaled_attn_weights2
-
-
-# sample_decoder_layer_output, _, _ = DecoderLayer(
-#     tf.random.uniform((64, 50, 512)), sample_encoder_layer_output, 512, 2048)
-
-# print(sample_decoder_layer_output.shape)
